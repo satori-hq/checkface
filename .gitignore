@@ -8,4 +8,4 @@ cache/
 
 .sass-cache
 
-.pem
+*.pem
