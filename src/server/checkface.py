@@ -500,19 +500,27 @@ def getFramesMorphdir(parentMorphDir, num_frames, image_dim, isLinear):
 
 def generate_morph_frames(fromLatentProxy: LatentProxy, toLatentProxy: LatentProxy, num_frames, image_dim, framenums, isLinear = False):
     """
-    For each specified frame num, checks if the frame exists
-    and if necessary generates and saves it. Returns the filenames
-    of all required frames, in the same order as framenums.
+    For each specified frame num,
+        - checks if the frame exists
+        - and if necessary generates and saves it. 
+    Returns the filenames of all required frames, in the same order as framenums.
+
     Note: does tricks to deduplucate where two frames use same file and
     may have extended frames outside the normal range, so in general you CAN'T
     rely on using glob for ffmpeg for example
 
-    If isLinear, linearly morphs from start to end (inclusive)
-    Else, trig morphs from start to end and back (last frame is one frame away from start) (deduplicates if even num_frames)
+    If isLinear,
+        -  linearly morphs from start to end (inclusive)
+    Else,
+        - trig morphs from start to end and back 
+        - (last frame is one frame away from start) 
+        - (deduplicates if even num_frames)
     """
-    parentMorphdir = getParentMorphdir(fromLatentProxy, toLatentProxy)
-
+    app.logger.info("generate_morph_frames() --------------------------")
+    parentMorphdir = getParentMorphdir(fromLatentProxy, toLatentProxy)    
     framesdir = getFramesMorphdir(parentMorphdir, num_frames, image_dim, isLinear)
+    app.logger.info(f"  parentMorphdir    {parentMorphdir}")
+    app.logger.info(f"  framesdir         {framesdir}")
     os.makedirs(framesdir, exist_ok=True)
 
     if (num_frames % 2) == 0 and not isLinear:
@@ -525,7 +533,15 @@ def generate_morph_frames(fromLatentProxy: LatentProxy, toLatentProxy: LatentPro
         framenums = [ i if i < num_frames / 2 or i >= num_frames else num_frames - i for i in framenums ]
 
     frames = [ (i, os.path.join(framesdir, f"img{i:03d}.jpg")) for i in framenums ]
+    app.logger.info(f"  frames:")
+    for f in frames:
+        app.logger.info(f"              {f}")
     filenames = [ fName for i, fName in frames ]
+    app.logger.info(f"  filenames:")
+    for fn in filenames:
+        app.logger.info(f"                    {fn}")
+    
+    
     deduplicateBy = set() # keep all filenames in frames to return, but don't generate same file multiple times
     if isLinear:
         vals = np.linspace(1, 0, num_frames, True) # in reverse to work same as trig
@@ -535,15 +551,17 @@ def generate_morph_frames(fromLatentProxy: LatentProxy, toLatentProxy: LatentPro
     jobs = []
     if all(os.path.isfile(fName) for fName in filenames):
         if len(filenames) == 1:
-            app.logger.info(f"Frame already exists: {filenames[0]}")
+            app.logger.info(f"  Frame already exists: {filenames[0]}")
         else:
-            app.logger.info(f"All required frames already exist in {framesdir}")
+            app.logger.info(f"  All required frames already exist in {framesdir}")
         return filenames
 
     for i, fName in frames:
+        app.logger.info(f"      fName   {fName}")
         if os.path.isfile(fName):
-            app.logger.info(f"Frame already exists: {fName}")
+            app.logger.info(f"    Frame already exists:   {fName}")
         elif not (fName in deduplicateBy):
+            app.logger.info(f"    Create Latent:     {fName}")
             lerpLatentProxy = LatentByLerp(fromLatentProxy, toLatentProxy, 1 - vals[i])
             job = GenerateImageJob(lerpLatentProxy, f"from {fromLatentProxy.getName()} to {toLatentProxy.getName()} n{num_frames}f{i}")
             q.put(job)
@@ -664,10 +682,11 @@ def get_to_latent(request):
     toGuidStr = request.args.get('to_guid')
     return useTextOrSeedOrGuid(toTextValue, toSeedStr, toGuidStr)
 
-def ffmpeg_generate_morph_file(filenames, outputFileName, fps=16, kbitrate=2400):
+def ffmpeg_generate_morph_file(filenames, outputFileName, fps=16, kbitrate=2400):    
     """
     Take a series of input image filenames and generates a morph file based on the outputFileName extension.
     """
+    app.logger.info("ffmpeg_generate_morph_file() --------------------------")
     with tempfile.NamedTemporaryFile(mode='w+t', delete=False) as concatfile:
         concatfile.writelines([ f"file '{filename}'\n" for filename in filenames])
         concatfile.close()
@@ -718,6 +737,9 @@ def gif_generation():
 
 @app.route('/api/mp4/', methods=['GET'])
 def mp4_generation():
+    app.logger.info(f"=========================================================")
+    app.logger.info(f"/api/mp4")
+    app.logger.info(f"=========================================================")
     fromLatentProxy = get_from_latent(request)
     toLatentProxy = get_to_latent(request)
 
@@ -729,11 +751,17 @@ def mp4_generation():
     parentMorphdir = getParentMorphdir(fromLatentProxy, toLatentProxy)
     mp4sDir = os.path.join(parentMorphdir, "mp4s")
     name = os.path.join(mp4sDir, f"n{num_frames}f{fps}x{image_dim}k{kbitrate}.mp4")
+    app.logger.info(f"parentMorphdir    {parentMorphdir}" )
+    app.logger.info(f"mp4sDir           {mp4sDir}")
+    app.logger.info(f"name              {name}")
 
     if not os.path.isfile(name):
         os.makedirs(mp4sDir, exist_ok=True)
         framenums = np.arange(num_frames)
         filenames = generate_morph_frames(fromLatentProxy, toLatentProxy, num_frames, image_dim, framenums, isLinear=False)
+        app.logger.info(f"filenames, {filenames}")
+        for filename in filenames:
+            app.logger.info(f"  {filename}")
         ffmpeg_generate_morph_file(filenames, name, fps=fps, kbitrate=kbitrate)
     else:
         app.logger.info(f"MP4 file already exists: {name}")
@@ -788,6 +816,9 @@ def linkpreview_generation():
 
 @app.route('/api/morphframe/', methods=['GET'])
 def morphframe():
+    app.logger.info(f"=========================================================")
+    app.logger.info(f"/api/morphframe")
+    app.logger.info(f"=========================================================")
     fromLatentProxy = get_from_latent(request)
     toLatentProxy = get_to_latent(request)
 
@@ -796,7 +827,11 @@ def morphframe():
     framenum = defaultedRequestInt(request, 'frame_num', 0, 0, num_frames)
     isLinear = argIsTrue(request, 'linear')
     framenums = [framenum]
+    app.logger.info("generate_morph_frames() --------------------------")
     filenames = generate_morph_frames(fromLatentProxy, toLatentProxy, num_frames, image_dim, framenums, isLinear)
+    app.logger.info(f"filenames, {filenames}")
+    for filename in filenames:
+        app.logger.info(f"{filename}")
 
     return send_file(filenames[0], mimetype='image/jpg')
 
