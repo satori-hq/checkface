@@ -7,3 +7,5 @@ outputImages/
 cache/
 
 .sass-cache
+
+.pem

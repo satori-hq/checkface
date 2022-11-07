@@ -9,6 +9,8 @@ RUN python fetchModel.py
 
 FROM tensorflow/tensorflow:1.15.5-gpu-py3
 
+RUN rm /etc/apt/sources.list.d/cuda.list
+RUN rm /etc/apt/sources.list.d/nvidia-ml.list
 RUN apt update
 RUN apt install --no-install-recommends -y ffmpeg
 COPY ./requirements.txt /app/requirements.txt
