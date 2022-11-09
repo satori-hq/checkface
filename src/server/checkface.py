@@ -93,6 +93,10 @@ def chooseQorDLat(Gs, latent1, latent2):
 
 
 def toImages(Gs, latents, image_size):
+    app.logger.info(f"")
+    app.logger.info(f"toImages() ----------------------------------------------")
+    app.logger.info(f"")
+
     with generatorNetworkTime.time():
         start = time.time()
         if(isinstance(latents, list)):
@@ -311,6 +315,9 @@ flask_cors.CORS(app) # enable CORS so can fetch content
 
 logging.basicConfig(level=logging.INFO)
 
+app.logger.info(f'mongodb_conn_str: {mongodb_conn_str}')
+app.logger.info(f'client:           {client}')
+app.logger.info(f'db:               {db}')
 
 @app.route('/status/', methods=['GET'])
 def status():
@@ -516,7 +523,9 @@ def generate_morph_frames(fromLatentProxy: LatentProxy, toLatentProxy: LatentPro
         - (last frame is one frame away from start) 
         - (deduplicates if even num_frames)
     """
+    app.logger.info(f"")
     app.logger.info("generate_morph_frames() --------------------------")
+    app.logger.info(f"")
     parentMorphdir = getParentMorphdir(fromLatentProxy, toLatentProxy)    
     framesdir = getFramesMorphdir(parentMorphdir, num_frames, image_dim, isLinear)
     app.logger.info(f"  parentMorphdir    {parentMorphdir}")
@@ -583,7 +592,9 @@ def generate_morph_frames(fromLatentProxy: LatentProxy, toLatentProxy: LatentPro
         start = time.time()
         imgs = [(job.wait_for_img(30), fName, dim) for (job, fName, dim) in jobs]
         diff = time.time() - start
+        app.logger.info(f"")
         app.logger.info(f"Waited {diff:.2f} seconds for {len(imgs)} morph frames")
+        app.logger.info(f"")
 
         for img, fName, dim in imgs:
             if not img:
@@ -738,8 +749,11 @@ def gif_generation():
 @app.route('/api/mp4/', methods=['GET'])
 def mp4_generation():
     app.logger.info(f"=========================================================")
+    app.logger.info(f"")
     app.logger.info(f"/api/mp4")
+    app.logger.info(f"")
     app.logger.info(f"=========================================================")
+    app.logger.info(f"")
     fromLatentProxy = get_from_latent(request)
     toLatentProxy = get_to_latent(request)
 
@@ -816,9 +830,13 @@ def linkpreview_generation():
 
 @app.route('/api/morphframe/', methods=['GET'])
 def morphframe():
+    app.logger.info(f"")
     app.logger.info(f"=========================================================")
+    app.logger.info(f"")
     app.logger.info(f"/api/morphframe")
+    app.logger.info(f"")
     app.logger.info(f"=========================================================")
+    app.logger.info(f"")
     fromLatentProxy = get_from_latent(request)
     toLatentProxy = get_to_latent(request)
 
@@ -852,6 +870,13 @@ def setEncodedImagesRecord(requestKey, guid, didAlign):
 
 @app.route('/api/encodeimage/', methods=['POST'])
 def encodeimage():
+    app.logger.info(f"")
+    app.logger.info(f"=========================================================")
+    app.logger.info(f"")
+    app.logger.info(f"/api/encodeimage")
+    app.logger.info(f"")
+    app.logger.info(f"=========================================================")
+    app.logger.info(f"")
     file = request.files['usrimg']
     if not file:
         return flask.Response('No file uploaded for usrimg', status=400)
@@ -859,11 +884,14 @@ def encodeimage():
     tryAlign = flask.request.form.get('tryalign', 'false')
     tryAlign = tryAlign.lower() == 'true'
     imgFile = file.read()
-
+    app.logger.info(f"tryAlign          {tryAlign}")
+    app.logger.info(f"imgFile           {imgFile}")
 
     # Cache encoding requests by a hash of the image file and value of tryAlign
     requestKey = encodeRequestKey(imgFile, tryAlign)
+    app.logger.info(f"requestKey        {requestKey}")
     existingRecord = getEncodedImagesRecord(requestKey)
+    app.logger.info(f"existingRecord    {existingRecord}")
     if existingRecord:
         app.logger.info(f"Image encoding for {file.filename} with tryalign={str(tryAlign)} already exists!")
         return flask.jsonify({ 'guid': existingRecord['guid'], 'did_align': existingRecord['did_align'] })
@@ -934,15 +962,19 @@ def worker():
 
         latents = np.array([job.latentproxy.getLatent(Gs) for job in generateImageJobs])
 
+        app.logger.info(f"")
         app.logger.info(f"Running jobs {[str(job) for job in generateImageJobs]}")
-
+        app.logger.info(f"")
         images = toImages(Gs, [toDLat(Gs, lat) for lat in latents], None)
         for img, job in zip(images, generateImageJobs):
             job.set_result(img)
             imagesGenCounter.inc()
 
+        app.logger.info(f"")
+        app.logger.info(f"=========================")
         app.logger.info(f"Finished batch job")
-
+        app.logger.info(f"=========================")
+        app.logger.info(f"")
 
 
 if __name__ == "__main__":
