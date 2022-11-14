@@ -32,7 +32,7 @@ protobuf==3.10.0
 pycparser==2.19
 pycrypto==2.6.1
 pygobject==3.26.1
-pymongo==3.10.1
+pymongo
 pyOpenSSL==19.0.0
 python-apt==1.6.5
 pyxdg==0.25
